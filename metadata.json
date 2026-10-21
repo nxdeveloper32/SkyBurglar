@@ -1,0 +1,6 @@
+{
+  "name": "The Great Getaway",
+  "description": "A vibrant 3D endless heist and police pursuit game with slow-motion thefts, coin rushes, vehicles, and hot-air balloon escapes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

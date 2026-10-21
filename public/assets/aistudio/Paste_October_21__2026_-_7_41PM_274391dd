@@ -1,0 +1,1253 @@
+# GAME DESIGN DOCUMENT (GDD)
+# PROJECT: THE GREAT GETAWAY
+### A 3D Procedural Thief vs Police Endless Chase Game
+
+**Document Type:** Complete Game Design + Master Development Specification  
+**Target Platforms:** Desktop browsers and Android mobile browsers  
+**Game Format:** 3D, third-person, endless arcade chase  
+**Visual Direction:** Stylized cartoon 3D, expressive characters, colorful city, cinematic transitions  
+**Core Design Pillar:** Simple controls, changing gameplay phases, escalating pursuit, endless replayability  
+**Technology Direction:** Three.js + TypeScript + Vite, using WebGL for 3D rendering  
+**Reference Assets:** User-provided masked thief and cartoon police officer images
+
+---
+
+# 1. GAME VISION
+
+Create a highly replayable, visually attractive 3D browser game in which a cartoon thief steals a wallet, escapes from the police, steals increasingly powerful vehicles, collects coins, unlocks temporary abilities and eventually escapes into the sky using a hot-air balloon.
+
+The police continuously adapt to the thief's progress. They begin chasing on foot, move to motorcycles and cars, and eventually deploy helicopters when the thief reaches the balloon.
+
+The game is endless: there is no conventional final level or permanent victory. Every run ends when the thief is caught or the pursuit reaches an unavoidable climax.
+
+The player's objective is to survive for as long as possible, complete theft challenges, collect coins, travel farther, unlock upgrades and beat their personal best.
+
+## 1.1 Core experience
+
+The player should feel:
+
+- Excited by constantly changing environments.
+- Smart when successfully completing theft challenges.
+- Powerful when upgrading the thief.
+- Nervous when police pressure increases.
+- Rewarded for collecting coins and discovering bonus routes.
+- Motivated to immediately start another run after being caught.
+
+The game should be easy to understand within the first 20 seconds but offer enough variation to remain entertaining after dozens of runs.
+
+## 1.2 The core gameplay loop
+
+**Run → Steal → Escape → Collect → Upgrade → Repeat**
+
+The important design rule is that running, theft and coin collection are separate, clearly signalled gameplay phases. They must not demand simultaneous attention.
+
+---
+
+# 2. GAMEPLAY PHASE SYSTEM
+
+This is the most important gameplay requirement.
+
+The game uses a state machine with three primary phases:
+
+1. ESCAPE
+2. THEFT
+3. COIN RUSH
+
+Only one phase can own the player's primary objective at any given time.
+
+## 2.1 Phase A: Escape
+
+**Objective:** Avoid the police and reach the next escape opportunity.
+
+The thief automatically moves forward. The player controls lateral movement, jumping, sliding, dodging and special escape actions.
+
+Features:
+- Three-lane road sections mixed with open-area segments.
+- Traffic, roadblocks, construction zones and environmental obstacles.
+- Police foot chases, motorcycle chases and vehicle pursuits.
+- Increasing movement speed and obstacle complexity.
+- Occasional escape opportunities involving a bike, car or hot-air balloon.
+
+During this phase:
+- Theft prompts are disabled.
+- Coin collection objectives are disabled.
+- Ordinary coins are not spawned.
+- The player concentrates on survival.
+
+The police may remain visible and animate naturally, but any special police takedown, weapon challenge or competing objective is disabled until its designated phase.
+
+## 2.2 Phase B: Theft
+
+**Objective:** Successfully steal the highlighted target.
+
+The world transitions into a short, focused theft encounter. Forward running is temporarily suspended, and the thief and target are positioned for a readable interaction.
+
+Examples:
+- Steal a wallet from a pedestrian.
+- Grab a parked motorcycle's key.
+- Hijack a car at a designated opportunity.
+- Reach a dangling rope or basket attached to a hot-air balloon.
+
+Each encounter has a single primary action, shown visually and optionally with a short text instruction.
+
+Example sequence:
+
+1. A target appears.
+2. The camera focuses on the target.
+3. A clear swipe or tap indicator appears.
+4. The player performs the action.
+5. The game evaluates success, partial success or failure.
+6. The next phase begins.
+
+A successful theft advances the escape sequence. Failure gives the police an advantage, increases pursuit pressure or causes the run to end if the encounter is already critical.
+
+During this phase:
+- Normal running obstacles stop spawning.
+- Ordinary coin collection pauses.
+- The player's primary objective is the theft interaction.
+- A short, predictable encounter timer is used.
+
+**Fairness requirement:** The player must receive sufficient visual warning to understand the required action. Failure must never occur because an instruction appeared too late or a gesture was not recognised correctly.
+
+## 2.3 Phase C: Coin Rush
+
+**Objective:** Collect as many coins as possible in a short bonus sequence.
+
+The game temporarily switches from survival to collection.
+
+Features:
+- Coins arranged in readable arcs and lines.
+- Multiple collection paths with different rewards.
+- Occasional high-value bonus coins.
+- Simple jumps, slides and lane changes.
+- A visible coin counter and a short phase timer.
+
+During this phase:
+- Normal theft encounters are disabled.
+- Theft prompts are not shown.
+- Police attacks and ordinary collision penalties are suspended.
+- Coin collection becomes the sole primary objective.
+
+The chase can remain visible in the distance, but it cannot interfere with the coin challenge.
+
+At the end of the phase, the game displays the coins earned and transitions back to Escape.
+
+## 2.4 Phase scheduling
+
+Use a weighted encounter director rather than selecting phases entirely at random.
+
+An illustrative sequence:
+
+| Distance | Phase | Purpose |
+|---|---|---|
+| 0–150 m | Escape | Teach movement |
+| 150–250 m | Theft | First vehicle opportunity |
+| 250–450 m | Escape | Introduce police vehicles |
+| 450–520 m | Coin Rush | Reward collection |
+| 520–750 m | Escape | Increase difficulty |
+| 750–850 m | Theft | Introduce a new vehicle |
+| 850–1,100 m | Escape | Intensify pursuit |
+| 1,100–1,200 m | Coin Rush | Bonus reward |
+| 1,200 m onward | Dynamic rotation | Weighted, escalating encounters |
+
+These are initial tuning values, not rigid level boundaries. Actual distance, phase duration and encounter frequency should be configurable.
+
+The director should:
+- Avoid repeating the same phase twice without a deliberate design reason.
+- Avoid showing the same theft target repeatedly.
+- Provide recovery time after difficult encounters.
+- Prevent a new phase from beginning during a jump, collision animation or vehicle transition.
+- Adapt encounter spacing to player performance without making success automatic.
+
+---
+
+# 3. CONTROLS AND INPUT DESIGN
+
+The game must work using a mouse and keyboard on desktop and touch gestures on Android browsers.
+
+## 3.1 Mobile controls
+
+The game should use a responsive landscape-first layout with an optional portrait-friendly interface if practical.
+
+| Gesture | Action |
+|---|---|
+| Swipe left | Move left or dodge left |
+| Swipe right | Move right or dodge right |
+| Swipe up | Jump, climb or perform the context-sensitive upward action |
+| Swipe down | Slide or duck |
+| Tap | Interact, grab, activate or attack when indicated |
+| Long press | Special action only when explicitly shown |
+
+Context determines the exact action. For example, an upward swipe during a balloon encounter can grab the rope rather than trigger an ordinary jump.
+
+Avoid requiring multi-finger gestures during the initial release.
+
+## 3.2 Desktop controls
+
+- A / Left Arrow: move left.
+- D / Right Arrow: move right.
+- W / Up Arrow / Space: jump or contextual upward action.
+- S / Down Arrow: slide.
+- Left Mouse Button: tap/interact.
+- Escape: pause or close an open menu.
+
+Controls should be configurable in a later settings update.
+
+## 3.3 Input handling rules
+
+- Use pointer events for mouse and touch compatibility.
+- Prevent accidental page scrolling during active gameplay.
+- Distinguish taps from swipes using a configurable movement threshold.
+- Consume one input once, preventing duplicate actions.
+- Ignore gameplay input while menus, settings or pause screens are open.
+- Disable repeated actions until the current action reaches a valid state.
+- Provide a short visual confirmation for every accepted input.
+- Support browser focus loss and tab switching without accidentally registering controls.
+
+Never require pixel-perfect swipes.
+
+---
+
+# 4. CHARACTER DESIGN AND ART DIRECTION
+
+## 4.1 Thief
+
+Use the first uploaded image as the visual reference.
+
+Character identity:
+- Exaggerated cartoon proportions.
+- Large expressive eyes and an oversized nose.
+- Black eye mask.
+- Black-and-grey striped sweater.
+- Dark trousers and brown shoes.
+- A mischievous, memorable grin.
+- A distinctive running posture.
+
+The character should feel mischievous and funny rather than frightening.
+
+As the thief upgrades, introduce visual changes:
+- Better shoes.
+- Gloves and a utility belt.
+- A more advanced escape outfit.
+- A distinctive backpack.
+- Cosmetic trails and celebratory animations.
+
+The character should remain recognisable across every upgrade.
+
+## 4.2 Police officer
+
+Use the second uploaded image as the visual reference.
+
+Character identity:
+- Friendly cartoon face.
+- Navy-blue police uniform.
+- Blue cap with a gold badge.
+- Dark boots and belt.
+- Expressive reactions and exaggerated pursuit animations.
+
+The police should look determined and comical. Pursuit intensity should come from behaviour, animation, sound and camera direction rather than frightening imagery.
+
+## 4.3 City art direction
+
+Build a colourful stylised city containing:
+- Streets and sidewalks.
+- Shops and apartment buildings.
+- Traffic lights and road signs.
+- Parks, bridges and intersections.
+- Construction zones.
+- Rooftops and elevated road sections.
+- Vehicle garages and escape locations.
+- A skyline with distant buildings.
+
+Use a consistent art style, readable silhouettes and a clear distinction between safe paths, obstacles, collectible items and theft targets.
+
+Avoid photorealism in the initial release because stylised assets are easier to optimise and visually maintain.
+
+---
+
+# 5. THE ESCAPE PROGRESSION
+
+The pursuit escalates through four major stages.
+
+## Stage 1: On foot
+
+The thief steals a wallet. A police officer notices the theft and starts chasing.
+
+Gameplay:
+- Basic three-lane movement.
+- Simple road obstacles.
+- Low speed.
+- Basic jumps and slides.
+- The player learns the core controls.
+
+First theft success unlocks the next vehicle opportunity.
+
+## Stage 2: Motorcycle
+
+The thief reaches a motorcycle and performs a successful hijack.
+
+Gameplay:
+- Increased forward speed.
+- Narrower reaction windows.
+- Traffic weaving.
+- Police motorcycles join the pursuit.
+- More demanding but predictable obstacles.
+
+The player is not required to manually drive the motorcycle like a racing simulator. The vehicle moves forward automatically.
+
+## Stage 3: Car
+
+The thief reaches a suitable car and successfully steals it.
+
+Gameplay:
+- Wider vehicle silhouette.
+- Higher forward speed.
+- Roadblocks and traffic patterns.
+- Police cars join the chase.
+- Contextual vehicle dodges and near-miss bonuses.
+
+Vehicle transitions should be animated rather than instantaneous model swaps.
+
+## Stage 4: Hot-air balloon
+
+The thief spots a hot-air balloon ahead or above the road. A rope or accessible basket becomes the next theft target.
+
+The player must execute a contextual jump-and-grab action.
+
+Once attached:
+- The thief climbs into the basket.
+- The camera pulls back to reveal the city.
+- The road chase transitions into an aerial chase.
+- Police helicopters appear.
+- The city continues generating beneath the balloon.
+
+The balloon is not a permanent safe zone. It is a new gameplay stage with its own hazards and escape opportunities.
+
+Possible aerial obstacles:
+- Rooftop structures.
+- Towers and cables.
+- Narrow passages between buildings.
+- Wind gusts represented by clear visual cues.
+- Helicopter searchlights.
+- Temporary safe flight corridors.
+
+The balloon must have a readable movement model and should not require complex flight simulation.
+
+## 5.1 Returning to the balloon
+
+The player must be able to leave and rejoin the balloon under appropriate conditions.
+
+Implement two contextual actions:
+- **Jump:** leave the basket and descend toward a designated landing zone.
+- **Reattach:** grab a visible rope or handle when the balloon is within reach.
+
+Returning to the balloon must require a valid opportunity, not arbitrary timing. The target should be highlighted and the interaction should provide a clear success window.
+
+A failed reattachment may cost pursuit time or trigger a recovery animation. It should not instantly end the run unless the player is already in a critical state.
+
+The player may switch between aerial and ground escape stages in later runs, providing variation without making the balloon mandatory in every run.
+
+---
+
+# 6. THEFT MECHANICS
+
+The theft system is a sequence of short skill checks.
+
+## 6.1 Encounter structure
+
+Each theft encounter contains:
+1. Target selection.
+2. Approach animation.
+3. Visual instruction.
+4. Input window.
+5. Success or failure evaluation.
+6. Feedback animation.
+7. Transition to the next phase.
+
+Each target has its own required gesture, timing window and reward.
+
+## 6.2 Theft outcomes
+
+**Perfect success**
+- The target is stolen cleanly.
+- The next progression stage unlocks.
+- A bonus score is awarded.
+- The police lose a small amount of pursuit advantage.
+
+**Normal success**
+- The theft completes.
+- The next stage becomes available.
+- Standard score and reward are granted.
+
+**Partial success**
+- The thief obtains a reduced reward.
+- The police move closer.
+- The player receives a shorter recovery window.
+
+**Failure**
+- The theft fails.
+- Pursuit pressure increases.
+- A recovery opportunity may be offered if the encounter permits it.
+- A critical failure can end the run.
+
+Do not make every missed swipe an immediate game over. Early encounters should be forgiving, while later encounters can demand more precision.
+
+## 6.3 Difficulty scaling
+
+Increase challenge gradually through:
+- Slightly shorter input windows.
+- More complex target animations.
+- Greater visual distraction.
+- Different required gestures.
+- More difficult vehicle transition timing.
+
+Never increase difficulty by hiding prompts, making targets visually ambiguous or ignoring valid input.
+
+---
+
+# 7. COINS, LOOT AND SCORE
+
+Coins are the primary soft currency.
+
+## 7.1 Coin types
+
+**Standard coins:** small, common rewards.
+
+**Bonus coins:** higher-value items placed along a more challenging route.
+
+**Loot rewards:** bonuses awarded for completing a theft encounter.
+
+**Perfect-run bonuses:** rewards for completing a sequence without a collision or theft failure.
+
+The visual appearance and value of each coin type must be immediately distinguishable.
+
+## 7.2 Score formula
+
+Calculate the final score from multiple independent factors:
+
+- Distance survived.
+- Coins collected.
+- Successful thefts.
+- Perfect thefts.
+- Near misses.
+- Phase completion bonuses.
+- Optional challenge bonuses.
+
+A configurable starting formula:
+
+`Final Score = Distance Score + Coin Score + Theft Score + Skill Bonuses`
+
+For example:
+
+- Distance: 1 point per metre.
+- Standard coin: 10 points.
+- Bonus coin: 50 points.
+- Successful theft: 250 points.
+- Perfect theft: an additional 150 points.
+- Near miss: 25 points, subject to a cooldown.
+
+These values are initial balancing parameters and should be tuned using actual playtests.
+
+Avoid double-counting coins as both currency and an excessively large score multiplier.
+
+## 7.3 End-of-run presentation
+
+The game-over screen should show:
+- Total score.
+- Distance travelled.
+- Coins collected.
+- Successful thefts.
+- Perfect encounters.
+- Highest vehicle stage reached.
+- New personal-best indicator.
+- Coins earned for upgrades.
+
+Reveal these values through animated counters and a short character reaction.
+
+Include a clear **Play Again** button and a secondary **Upgrade** button.
+
+---
+
+# 8. WEAPON AND ABILITY PROGRESSION
+
+The thief gradually unlocks cartoon-style gadgets that provide temporary advantages during escape phases.
+
+These are arcade mechanics, not realistic weapon simulations.
+
+## 8.1 Upgrade tiers
+
+**Tier 1: Stones**
+
+- Basic distraction gadget.
+- Limited charge.
+- Automatically replenishes after a cooldown.
+- Can briefly interrupt a pursuing officer or activate a designated environmental distraction.
+
+**Tier 2: Smoke or Molotov-style gadget**
+
+- Unlocks after sufficient progression.
+- Uses a stylised, non-graphic effect.
+- Briefly disrupts the pursuit or blocks a designated route.
+- Automatically replenishes after a cooldown.
+
+**Tier 3: Cartoon grenade**
+
+- Creates a short-lived distraction effect.
+- Temporarily interrupts nearby pursuit units.
+- Uses exaggerated effects and no graphic injury.
+
+**Tier 4: Arcade pistol**
+
+- Uses fictional projectiles and abstract hit effects.
+- Limited ammunition.
+- Automatically reloads after a visible cooldown.
+- Temporarily disables or distracts a pursuit vehicle rather than permanently eliminating the police system.
+
+All gadgets must be optional advantages rather than mandatory requirements for basic survival.
+
+## 8.2 Important balance rules
+
+- Gadgets must never make the game permanently safe.
+- Police reinforcements continue to arrive as the pursuit escalates.
+- Gadgets cannot bypass a required theft interaction.
+- The UI must clearly show charge count, cooldown and availability.
+- A gadget should not activate accidentally when the player intends to swipe.
+- Early players should have enough time to understand each new ability.
+- New abilities unlock through play and upgrades, not only through paid purchases.
+
+Use fictional effects and avoid realistic instructions, damage models or gore.
+
+## 8.3 Upgrade economy
+
+Coins can be spent on:
+- Starting gadget cooldown.
+- Maximum gadget charges.
+- Reload speed.
+- Coin collection radius.
+- Cosmetic outfits.
+- Character animations.
+- Visual effects.
+- Optional starting bonuses.
+
+Permanent upgrades must have diminishing returns and reasonable maximum levels.
+
+No upgrade should make later difficulty trivial.
+
+---
+
+# 9. POLICE AI AND PURSUIT PRESSURE
+
+The police are the main dynamic threat.
+
+The game should not rely on a single officer following the thief at a fixed distance. Instead, use a pursuit director that selects different police behaviours according to the current phase and escalation level.
+
+## 9.1 Pursuit states
+
+**Searching:** police notice the theft and begin pursuit.
+
+**Chasing:** officers actively follow the player.
+
+**Intercepting:** police attempt to block a future route.
+
+**Reinforcing:** additional units join the chase.
+
+**Critical pursuit:** the chase becomes more intense, with fewer safe recovery opportunities.
+
+**Caught:** the thief is captured, triggering the end-of-run sequence.
+
+## 9.2 Police escalation
+
+| Pursuit stage | Police response |
+|---|---|
+| Early | One officer on foot |
+| Developing | Additional foot officers |
+| Vehicle chase | Police motorcycles |
+| High-speed chase | Police cars and roadblocks |
+| Aerial chase | Police helicopters |
+| Critical | Combined units and increasingly difficult escape routes |
+
+Escalation must be based on distance, successful thefts, elapsed time and pursuit pressure.
+
+The system should not spawn every police type at once.
+
+## 9.3 Pursuit pressure meter
+
+Display a compact, readable pursuit indicator.
+
+The meter rises when:
+- A theft fails.
+- The player collides with major obstacles.
+- The player repeatedly loses escape opportunities.
+- A critical encounter is missed.
+
+It may decrease slightly after:
+- A perfect theft.
+- A successful special escape.
+- A particularly difficult obstacle sequence completed cleanly.
+
+At high pressure:
+- Police move closer.
+- Interception opportunities increase.
+- Recovery windows become shorter.
+- Special police units appear more frequently.
+
+The pursuit meter should create tension, not function as an invisible random death timer.
+
+## 9.4 Capture conditions
+
+The run ends when one of the following occurs:
+- The player fails a critical theft encounter.
+- A major collision triggers a capture sequence.
+- The police close the capture gap during a designated pursuit event.
+- The player misses a mandatory escape transition.
+- A critical pursuit event is failed.
+
+Every capture must be understandable from the player's actions. Avoid instant, unexplained game overs.
+
+**The player cannot permanently defeat every police officer.** Gadgets delay or disrupt the pursuit, while escalation ensures that the chase eventually becomes more difficult.
+
+---
+
+# 10. PROCEDURAL CITY GENERATION
+
+The city must appear endless without generating unlimited geometry or consuming unlimited memory.
+
+Use a segment-based procedural generation system.
+
+## 10.1 Segment structure
+
+Build the city from reusable road segments, for example:
+- Straight road.
+- Road with parked cars.
+- Intersection.
+- Construction zone.
+- Bridge.
+- Market street.
+- Park road.
+- Tunnel.
+- Rooftop passage.
+- Balloon transition area.
+
+Each segment should have:
+- A defined length.
+- Valid entry and exit positions.
+- Lane and obstacle metadata.
+- Optional coin layouts.
+- A difficulty rating.
+- Allowed vehicle types.
+- Optional visual variations.
+
+The procedural director selects compatible segments and assembles them ahead of the player.
+
+## 10.2 Spawn and despawn
+
+Maintain a limited rolling window of active segments.
+
+For example:
+- Several segments ahead for upcoming obstacles.
+- The segment containing the player.
+- A few segments behind for camera visibility and transition animations.
+
+Once a segment is sufficiently far behind the player and no longer required by an animation, return it to an object pool.
+
+Do not create and destroy large amounts of geometry every frame.
+
+## 10.3 Deterministic generation
+
+Use a seeded random-number generator for procedural decisions.
+
+A run seed allows the same city sequence to be reproduced for debugging and testing.
+
+Randomness should control decoration and obstacle selection, but progression rules must remain deterministic enough to guarantee a fair path.
+
+## 10.4 Fairness constraints
+
+Every generated segment must satisfy these conditions:
+- At least one valid escape route exists.
+- Mandatory theft targets are reachable.
+- Coins do not spawn inside unavoidable obstacles.
+- Jump distances remain physically achievable.
+- Slide sections provide sufficient clearance.
+- Lane changes are not required faster than the input system allows.
+- Vehicle and balloon transitions connect to compatible segments.
+- Difficulty transitions do not produce unavoidable collisions.
+
+Use predefined segment templates with controlled procedural variation rather than generating arbitrary roads from scratch.
+
+## 10.5 What is rendered?
+
+The game renders only visible or soon-to-be-visible content, with a limited buffer ahead and behind.
+
+Use:
+- Object pooling.
+- Instanced meshes for repeated coins and decorations.
+- Level-of-detail reductions for distant objects.
+- Simplified collision geometry.
+- Shared materials and textures.
+- Fog and skyline silhouettes to hide distant boundaries.
+
+This is essential for Android browser performance.
+
+---
+
+# 11. GAME FLOW AND STATE MACHINE
+
+The game should use explicit states rather than scattered boolean flags.
+
+Required states:
+
+- Loading.
+- Main Menu.
+- Tutorial.
+- Run Starting.
+- Escape.
+- Theft.
+- Coin Rush.
+- Vehicle Transition.
+- Balloon Chase.
+- Pause.
+- Game Over.
+- Upgrade Shop.
+- Settings.
+
+Each state owns its own input rules, UI, gameplay objectives and transition conditions.
+
+## 11.1 Example transitions
+
+`Main Menu → Tutorial → Escape → Theft → Escape → Coin Rush → Escape`
+
+`Escape → Vehicle Transition → Escape`
+
+`Escape → Balloon Transition → Balloon Chase`
+
+`Any active gameplay state → Pause`
+
+`Any failed critical encounter → Game Over`
+
+`Game Over → Upgrade Shop → Main Menu or New Run`
+
+## 11.2 Transition requirements
+
+- Transitions must not reset the score.
+- Coins collected during a phase must persist across transitions.
+- Player position and vehicle state must be saved correctly.
+- Inputs must be disabled during critical animation frames where necessary.
+- Repeated transition triggers must not duplicate vehicles, rewards or UI.
+- The game must not spawn obstacles during a transition animation.
+
+---
+
+# 12. MENUS AND USER INTERFACE
+
+The menu system should use a polished material-inspired design with dark surfaces, metallic accents, subtle depth, bold typography and striped visual elements inspired by the thief.
+
+## 12.1 Main menu
+
+Required elements:
+- Game logo.
+- Animated thief.
+- Police officer in the background.
+- Large Play button.
+- Coins and upgrade access.
+- Settings.
+- Best score.
+- A subtle city environment behind the menu.
+
+Avoid excessive menu options.
+
+## 12.2 In-game HUD
+
+Display only essential information:
+- Current score.
+- Distance.
+- Coins.
+- Pursuit pressure.
+- Current gadget and cooldown.
+- Phase indicator.
+- Contextual gesture prompt.
+
+Hide irrelevant HUD elements during theft and coin phases.
+
+## 12.3 Pause menu
+
+Options:
+- Resume.
+- Restart.
+- Settings.
+- Return to Main Menu.
+
+Restarting must require confirmation if it would discard a significant active run.
+
+## 12.4 Upgrade shop
+
+Organise upgrades into simple categories:
+- Gadgets.
+- Utility.
+- Cosmetics.
+
+Every upgrade card must show:
+- Name.
+- Current level.
+- Effect.
+- Price.
+- Next-level benefit.
+- Purchase availability.
+
+Do not use unexplained icons or ambiguous currencies.
+
+## 12.5 Game-over screen
+
+The thief should react comically to being caught.
+
+The police officer can pose beside the thief while the city continues in a short background animation.
+
+The screen should emphasise the player's new score, distance and earned coins.
+
+The primary action is Play Again.
+
+---
+
+# 13. AUDIO AND GAME FEEDBACK
+
+Audio is essential to making simple gameplay feel exciting.
+
+Required sound categories:
+- Footsteps.
+- Vehicle engines.
+- Police sirens.
+- Coin collection.
+- Successful theft.
+- Failed theft.
+- Gadget activation.
+- Collision.
+- Jump and landing.
+- Balloon rope attachment.
+- Helicopter rotor.
+- Phase transitions.
+- Menu interaction.
+- Game over.
+- Personal-best celebration.
+
+Use layered audio, but keep the mix clear.
+
+Police sirens should intensify with pursuit pressure. Coin sounds should be short and satisfying. Perfect thefts should have a distinctive reward sound.
+
+Because browser audio may require user interaction, initialise sound after the player starts the game.
+
+Provide separate music and effects volume controls.
+
+---
+
+# 14. BROWSER TECHNOLOGY AND ARCHITECTURE
+
+## 14.1 Recommended stack
+
+- **Three.js:** 3D rendering.
+- **TypeScript:** gameplay logic and stronger type safety.
+- **Vite:** local development and production build.
+- **HTML/CSS:** menus and interface overlays.
+- **Web Audio API:** sound and music.
+- **LocalStorage:** basic settings, best score and local progression.
+- **IndexedDB:** optional larger save data if needed.
+
+Use WebGL as the baseline rendering technology for broad browser compatibility. Do not make WebGPU mandatory.
+
+The game should work on current desktop Chrome and Android Chrome, with graceful degradation on devices that have weaker graphics hardware.
+
+## 14.2 Architecture
+
+Organise the code into clear modules:
+
+- `GameApp`: application lifecycle.
+- `GameStateManager`: explicit state transitions.
+- `InputManager`: touch, mouse and keyboard.
+- `PlayerController`: movement and animation.
+- `TheftSystem`: theft interactions and outcomes.
+- `PhaseDirector`: phase selection and scheduling.
+- `PursuitDirector`: police AI and pressure.
+- `ProceduralCity`: segment selection and generation.
+- `SegmentPool`: reusable environment objects.
+- `VehicleSystem`: motorcycle and car progression.
+- `BalloonSystem`: aerial gameplay.
+- `GadgetSystem`: charges and cooldowns.
+- `CoinSystem`: collection and currency.
+- `ScoreManager`: scoring and records.
+- `AudioManager`: music and sound effects.
+- `UIManager`: HUD, menus and transitions.
+- `SaveManager`: persistent settings and progression.
+- `PerformanceMonitor`: frame time and memory-related diagnostics.
+
+Use events or typed messages for communication between systems where appropriate.
+
+Do not put all game logic in one large component or one oversized source file.
+
+## 14.3 Rendering and performance
+
+Target:
+- 60 FPS on capable desktop devices.
+- A stable 30–60 FPS on supported Android devices.
+- Fast initial loading.
+- Minimal unnecessary network requests.
+- Bounded memory usage.
+- No unbounded creation of meshes, materials or event listeners.
+
+Use a fixed or bounded simulation timestep with a capped frame delta. Rendering should use the animation frame loop.
+
+Pause or reduce simulation when the tab becomes hidden. Resume safely when the player returns.
+
+## 14.4 Browser compatibility
+
+- Support touch and mouse input.
+- Prevent accidental page scrolling while playing.
+- Respect device pixel ratio with a configurable cap.
+- Handle orientation changes.
+- Handle browser focus loss.
+- Avoid requiring login.
+- Allow local single-player play without a backend.
+- Provide a visible loading screen and recovery message if WebGL is unavailable.
+
+The initial version should not depend on an online server for its core game loop.
+
+---
+
+# 15. MONETISATION AND RETENTION
+
+The initial priority is a complete, enjoyable playable game.
+
+Start with:
+- Free gameplay.
+- Local score tracking.
+- Permanent coin upgrades.
+- Cosmetic unlocks.
+- Daily challenges as a later enhancement.
+- Optional rewarded advertising only if a compliant advertising integration is added.
+
+Do not build mandatory advertisements into the first prototype.
+
+Avoid pay-to-win upgrades. Purchases should not be required to complete the introductory escape sequence.
+
+Retention features:
+- Personal-best records.
+- New gadget unlocks.
+- Character cosmetics.
+- Randomised city combinations.
+- Daily or rotating objectives.
+- Distance milestones.
+- Achievement badges.
+- New police behaviours.
+- Alternative escape routes.
+
+Every run should introduce variation without changing the basic controls.
+
+---
+
+# 16. TUTORIAL AND ONBOARDING
+
+The tutorial must teach the game through gameplay rather than long instructions.
+
+Suggested sequence:
+
+**Step 1 — Run**
+
+Show a simple obstacle and ask the player to swipe left or right.
+
+**Step 2 — Dodge**
+
+Introduce a second obstacle that requires a different direction.
+
+**Step 3 — Steal**
+
+Show a wallet target with a clear gesture prompt.
+
+**Step 4 — Collect**
+
+Introduce a short coin line and show the counter increasing.
+
+**Step 5 — Vehicle**
+
+Teach the motorcycle transition through one simple interaction.
+
+**Step 6 — Gadget**
+
+Introduce the stone distraction and its cooldown.
+
+**Step 7 — Continue**
+
+Return to the normal game loop.
+
+Tutorial prompts should disappear after successful completion and should not repeatedly interrupt experienced players.
+
+---
+
+# 17. EDGE CASES AND FAILURE PREVENTION
+
+The game must handle the following cases correctly:
+
+1. A swipe begins on a UI button and accidentally moves the thief.
+2. Two touch gestures occur simultaneously.
+3. The player loses browser focus during a theft encounter.
+4. The device changes orientation mid-run.
+5. A vehicle transition starts while an obstacle is still active.
+6. A theft target becomes unreachable due to procedural generation.
+7. The player collects a coin during a phase transition.
+8. A gadget is activated when its cooldown is not complete.
+9. The same reward is granted twice because of duplicate collision events.
+10. The player presses Restart repeatedly.
+11. The browser cannot initialise WebGL.
+12. A low-memory device experiences severe frame drops.
+13. A save is missing or corrupted.
+14. The player pauses during a capture animation.
+15. The balloon exits the valid gameplay area.
+16. A mandatory route has no valid escape path.
+17. An input is registered twice after a long frame.
+18. The page is refreshed during an active run.
+
+Every edge case must have a predictable recovery path.
+
+---
+
+# 18. DEVELOPMENT ROADMAP
+
+Build the game in small, testable milestones.
+
+## Milestone 1: Playable movement prototype
+
+Implement:
+- Three.js scene.
+- Third-person camera.
+- Automatic forward movement.
+- Lane changes.
+- Jump and slide.
+- Touch, mouse and keyboard support.
+- Basic collision handling.
+
+**Acceptance:** A player can run and dodge obstacles on desktop and Android browsers.
+
+## Milestone 2: Core phase system
+
+Implement:
+- Escape state.
+- Theft state.
+- Coin Rush state.
+- Phase transitions.
+- Contextual gesture prompts.
+- Basic scoring.
+
+**Acceptance:** Only one primary objective is active at a time, and every phase starts and ends correctly.
+
+## Milestone 3: Theft and vehicle progression
+
+Implement:
+- Wallet theft.
+- Motorcycle encounter.
+- Car encounter.
+- Balloon rope interaction.
+- Transition animations.
+
+**Acceptance:** Successful thefts unlock the next stage, and failed interactions produce consistent consequences.
+
+## Milestone 4: Police pursuit
+
+Implement:
+- Foot pursuit.
+- Police motorcycles.
+- Police cars.
+- Helicopters.
+- Pursuit pressure.
+- Capture conditions.
+
+**Acceptance:** Police escalation responds to player progression without generating unavoidable encounters.
+
+## Milestone 5: Procedural city
+
+Implement:
+- Reusable road segments.
+- Weighted segment selection.
+- Obstacle and coin layouts.
+- Object pooling.
+- Segment cleanup.
+- Deterministic seeds.
+
+**Acceptance:** The city can continue indefinitely without unbounded segment growth, invalid paths or obvious gaps.
+
+## Milestone 6: Gadgets and upgrades
+
+Implement:
+- Stone distraction.
+- Advanced gadgets.
+- Charges and cooldowns.
+- Upgrade shop.
+- Persistent currency.
+
+**Acceptance:** Gadget behaviour is consistent, understandable and balanced.
+
+## Milestone 7: Full interface and presentation
+
+Implement:
+- Main menu.
+- HUD.
+- Pause screen.
+- Game-over screen.
+- Settings.
+- Audio.
+- Tutorial.
+- Animated score reveal.
+
+**Acceptance:** The player can navigate the complete game flow without developer tools or manual state resets.
+
+## Milestone 8: Browser optimisation and release
+
+Test:
+- Desktop Chrome.
+- Android Chrome.
+- Touch input.
+- Orientation changes.
+- Performance.
+- Save persistence.
+- WebGL failure.
+- Repeated restarts.
+- Long-duration runs.
+
+**Acceptance:** The game is playable from a deployed website without installing an app.
+
+---
+
+# 19. DEFINITION OF DONE
+
+The game is not considered complete merely because a 3D character can run.
+
+The release must include:
+
+- A complete main menu.
+- Playable third-person movement.
+- Responsive desktop and mobile controls.
+- All three gameplay phases.
+- Theft success and failure outcomes.
+- Vehicle progression.
+- Balloon escape and helicopter pursuit.
+- Police escalation.
+- Functional gadgets and cooldowns.
+- Coin collection and score calculation.
+- Procedural city segments.
+- Object pooling and cleanup.
+- Game-over and restart.
+- Upgrade shop and persistent local progression.
+- Sound effects and feedback.
+- Tutorial and settings.
+- Responsive HUD.
+- Error handling and performance safeguards.
+- A production build that can be deployed to a static web host.
+
+No major button should be decorative or nonfunctional. No gameplay feature should be represented by a placeholder when it is claimed to be implemented.
+
+---
+
+# 20. MASTER DEVELOPMENT PROMPT
+
+Use the following prompt with an AI coding agent to develop the actual game.
+
+## Role
+
+You are a senior browser-game developer, 3D gameplay programmer, game designer, technical artist and QA engineer.
+
+Build a complete, playable 3D browser game using the specifications in this document. Treat the GDD as the source of truth. You are responsible for implementing the actual game, not merely creating a design mockup or a visual demonstration.
+
+## Primary objective
+
+Create a polished stylised 3D endless chase game in which a masked cartoon thief escapes from police through an evolving city, performs theft interactions, collects coins during dedicated bonus phases, unlocks temporary gadgets and progresses through foot, motorcycle, car and hot-air-balloon escape stages.
+
+The game must run in desktop browsers and Android mobile browsers.
+
+## Technical requirements
+
+1. Use Three.js, TypeScript and Vite.
+2. Use WebGL for broad compatibility.
+3. Build responsive HTML/CSS interface overlays.
+4. Implement touch, mouse and keyboard controls.
+5. Keep the game loop independent of any backend.
+6. Use object pooling for road segments, coins, obstacles and reusable effects.
+7. Use seeded procedural generation.
+8. Persist local settings, currency and best score.
+9. Keep systems modular and testable.
+10. Provide a working development command and production build command.
+
+## Gameplay requirements
+
+Implement an explicit state machine with Escape, Theft and Coin Rush as mutually exclusive primary gameplay phases.
+
+When Theft is active, suspend normal running obstacles and coin objectives. When Coin Rush is active, disable theft interactions and competing police threats. When Escape is active, focus gameplay on movement, obstacles and pursuit.
+
+Maintain a shared run state so score, distance, coins, progression and pursuit pressure persist correctly across transitions.
+
+Implement contextual gestures and clear visual prompts. Support mouse and keyboard equivalents for desktop players.
+
+Theft success must unlock progression, while failure increases pursuit pressure or triggers a critical failure when appropriate.
+
+## World requirements
+
+Build a procedural city using compatible reusable segments. Maintain a bounded number of active segments. Ensure every mandatory transition has a valid route and every generated obstacle sequence is physically achievable.
+
+Use a visible camera buffer ahead of the player. Remove or recycle segments after they are no longer needed.
+
+## Police and gadgets
+
+Implement escalating pursuit from foot officers to motorcycles, cars and helicopters. Use a configurable pursuit pressure system.
+
+Gadgets must provide temporary arcade advantages with charges and cooldowns. They must not permanently eliminate the police or make the game impossible to lose.
+
+## UI requirements
+
+Implement a complete main menu, HUD, pause screen, settings screen, upgrade shop and animated game-over screen.
+
+Use a dark, polished material-inspired interface with striped visual accents and metallic details. Keep the thief and police visually consistent with the supplied reference images.
+
+## Quality requirements
+
+- No dead buttons.
+- No fake score updates.
+- No duplicated rewards.
+- No repeated phase-transition bugs.
+- No unavoidable generated obstacle sequences.
+- No infinite accumulation of world objects.
+- No controls that require a mouse on mobile.
+- No dependence on a developer console to play.
+- No unhandled critical runtime errors.
+- No misleading claims that an unimplemented feature is complete.
+
+## Implementation workflow
+
+Work in small, functional milestones.
+
+First, inspect the available project files and establish the project structure. If the project is empty, scaffold it.
+
+Then implement and test movement before adding the complete progression system. Add the three gameplay phases next, followed by theft encounters, vehicles, pursuit AI, procedural generation, gadgets, UI, persistence and optimisation.
+
+After each milestone:
+1. Run the development build.
+2. Fix compilation and runtime errors.
+3. Test the relevant gameplay.
+4. Verify desktop and touch controls.
+5. Check that existing functionality still works.
+6. Document completed functionality and remaining limitations.
+
+Do not replace working systems with mockups when moving to the next milestone.
+
+If an asset is unavailable, create a visually consistent procedural or primitive placeholder and clearly document it. Do not block the core gameplay on the availability of paid assets.
+
+## Final deliverables
+
+Provide:
+- Complete source code.
+- Clear project structure.
+- Asset and dependency instructions.
+- Local setup instructions.
+- Development and production commands.
+- A production-ready web build.
+- A concise list of completed features.
+- A test checklist and known limitations.
+
+Begin with the smallest playable version, then expand it into the complete game defined by this GDD.
+
+**Final acceptance condition:** A player must be able to open the game in a browser, start a run, dodge obstacles, complete theft challenges, collect coins during separate bonus phases, experience escalating police pursuit, reach the balloon stage, get caught, view a final score, purchase upgrades and immediately play again.
+
+The result must be an actual playable game, not merely a rendered scene or a collection of static UI screens.
