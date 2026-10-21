@@ -23,5 +23,3 @@ This project is a reminder that AI is more than just a content-generation tool. 
 🚀 **The goal: Don't just use AI. Build with AI.**
 
 What would you build with AI?
-
-#AI #GameDevelopment #BuildWithAI #BrowserGame #IndieGameDev #ArtificialIntelligence #ThreeJS
